@@ -68,13 +68,13 @@ def ConvolucionarK1D(kernel, img):
     img_procesada = AnadirPaddingX(img, orden)
     img_final = np.zeros_like(img, dtype=np.float64)
     kernel_x = np.tile(kernel, (img_procesada.shape[0], 1))
-    array_aux = np.zeros(shape=(img_procesada.shape[0], orden))
+    # array_aux = np.zeros(shape=(img_procesada.shape[0], orden))
 
     for i in range(img.shape[1]):
         indices = []
         for j in range(orden):
             indices.append(i + j)
-        array_aux = img_procesada[:, indices]
+        array_aux = np.copy(img_procesada[:, indices])
         img_final[:, i] = np.sum(array_aux * kernel_x, axis=1)
     return img_final
 
@@ -134,6 +134,7 @@ def CalculaSigmaAAplicar(sigma_incial, sigma_final):
 def ImagenSemilla(img):
     tamanio = CalculaTamanioMascara(1.519)
     return Convolucionar2D(CalculaKernelGaussiana1D(tamanio), CalculaKernelGaussiana1D(tamanio), img)
+
 
 def ImagenSemillaSuboctava(img):
     tamanio = CalculaTamanioMascara(0.62)
@@ -298,8 +299,8 @@ def DevolverValor(a):
 def ObtenerKeypointsSignificativos(lista_max):
     cien_mejores = np.copy(lista_max)
     cien_mejores_ordenador = cien_mejores[cien_mejores[:, 0].argsort()]
-    cien_mejores_ordenador = np.concatenate((cien_mejores_ordenador[0:49,:], cien_mejores_ordenador[-50:,:]))
-    keypoints=[]
+    cien_mejores_ordenador = np.concatenate((cien_mejores_ordenador[0:49, :], cien_mejores_ordenador[-50:, :]))
+    keypoints = []
     for i in range(cien_mejores_ordenador.shape[0]):
         keypoints.append(cien_mejores_ordenador[i][1])
 
@@ -307,11 +308,11 @@ def ObtenerKeypointsSignificativos(lista_max):
 
 
 def DerivaDogX(dog):
-    derivada_dog=[]
+    derivada_dog = []
 
     for i in range(dog):
         for j in range(dog[i]):
-            derivada_dog.append(ConvolucionarK1D([1,0,-1],dog[i][j]))
+            derivada_dog.append(ConvolucionarK1D([1, 0, -1], dog[i][j]))
 
     return derivada_dog
 
@@ -330,16 +331,16 @@ def DerivaDogSigma(dog):
     derivada_dog = dog.copy()
 
     for i in range(dog):
-        for j in range(1,len(dog[i])):
+        for j in range(1, len(dog[i])):
             for k in range(dog[i][j].shape[0]):
                 for m in range(dog[i][j].shape[0]):
-                    derivada_dog[i][j][k][m]=derivada_dog[i][j-1][k][m]-derivada_dog[i][j+1][k][m]
+                    derivada_dog[i][j][k][m] = derivada_dog[i][j-1][k][m]-derivada_dog[i][j+1][k][m]
 
     return derivada_dog
 
 
 # Debemos calcular para el punto x^ = (x,y,sigma) D(x^)=
-def ObtenerKeypointsSignificativos(lista_max,dog_img, sigma_inicial):
+def ObtenerKeypointsSignificativosv2(lista_max, dog_img, sigma_inicial):
     keypoints = []
     # Necesitamos la primera derivada y la segunda derivada del DoG, tanto en x, como en y, como en sigma
     # Primeras derivadas
@@ -351,12 +352,8 @@ def ObtenerKeypointsSignificativos(lista_max,dog_img, sigma_inicial):
     segunda_derivada_y = DerivaDogX(derivada_y)
     segunda_derivada_sigma = DerivaDogSigma(derivada_sigma)
 
-
     for i in range(lista_max):
-        valor = lista_max[i][1]+
-
-
-
+        valor = lista_max[i][1]+1
 
     return keypoints
 
@@ -375,6 +372,7 @@ def KeyPoints(img, oct, esc, sigma_inicial):
     #   print("Coord:",keypoints_img[i].pt,"Size calculo:",keypoints_img[i].size,"Size func.",keypoints_img[i].angle)
     img_final = cv2.drawKeypoints(img, keypoints_img, None, flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
     return img_final
+
 
 def ejercicio1():
     perro = cv2.imread(r"C:\Users\Usuario\Desktop\Universidad\Informatica\Vision por Computador\perro.jpg", 0)
@@ -436,7 +434,7 @@ def ejercicio5():
     maximos_v2 = HallarExtremosLocalesV2(Dog_perro)
     print(len(maximos))
     for i in range(98):
-        print(maximos[i][1].pt,maximos[i][1].size,"////",maximos_v2[i][1].pt,maximos_v2[i][1].size)
+        print(maximos[i][1].pt, maximos[i][1].size, "////", maximos_v2[i][1].pt, maximos_v2[i][1].size)
 
 
 def ejercicio6():
@@ -444,14 +442,14 @@ def ejercicio6():
     octavas_perro = Octavas(3, 3, perro)
     Dog_perro = DiferenciaDeGaussianas(octavas_perro)
 
-    maximosV2 = ObtenerKeypointsSognificativos(HallarExtremosLocalesV2(Dog_perro))
-    maximos = ObtenerKeypointsSognificativos(HallarExtremosLocales(Dog_perro))
+    maximosV2 = ObtenerKeypointsSignificativos(HallarExtremosLocalesV2(Dog_perro))
+    maximos = ObtenerKeypointsSignificativos(HallarExtremosLocales(Dog_perro))
     for i in range(len(maximosV2)):
         print(maximosV2[i].pt, maximos[i].pt)
 
 
 def ejercicio7():
-    gato = cv2.imread(r"C:\Users\Usuario\Desktop\Universidad\Informatica\Vision por Computador\Yosemite1.jpg", 0)
+    gato = cv2.imread(r"C:\Users\judith\Desktop\UNIVERSIDAD\Vision por Computador\Practica 1\perro.jpg", 0)
     plt.figure(uuid.uuid4(), figsize=(20, 20))
     plt.imshow(KeyPoints(gato, 3, 3, 1.6))
     plt.show()
@@ -470,13 +468,14 @@ def ejercicio8():
     # Hallamos los extremos locales
     extremos = HallarExtremosLocales(dog_gato, 0.8)
     # Tomamos los significativos
-    extremos_significativos = ObtenerKeypointsSognificativos(extremos)
+    extremos_significativos = ObtenerKeypointsSignificativos(extremos)
     print(len(extremos_significativos))
     # Los pintamos sobre la imagen
     gato_keypoints = cv2.drawKeypoints(gato, extremos_significativos, None, flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
     plt.figure(uuid.uuid4(), figsize=(20, 20))
     plt.imshow(gato_keypoints)
     plt.show()
+
 
 if __name__ == '__main__':
     # ejercicio1()
@@ -487,6 +486,3 @@ if __name__ == '__main__':
     # ejercicio6()
     ejercicio7()
     # ejercicio8()
-
-
-
