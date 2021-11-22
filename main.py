@@ -604,32 +604,51 @@ def ejercicio7sinrefinar():
     plt.show()
 
 
-def ejercicio8():
-    sift = cv2.SIFT_create()
-    # Extraer puntos SIFT con detect and compute
-    yosemite1 = cv2.imread(r"C:\Users\judith\Desktop\UNIVERSIDAD\Vision por Computador\Practica 2\Yosemite1.jpg", 0)
-    yosemite2 = cv2.imread(r"C:\Users\judith\Desktop\UNIVERSIDAD\Vision por Computador\Practica 2\Yosemite2.jpg", 0)
-    (keypoints_1, descriptors_1) = sift.detectAndCompute(yosemite1, None)
-    (keypoints_2, descriptors_2) = sift.detectAndCompute(yosemite2, None)
-    img_compuesta = np.concatenate((yosemite1, yosemite2), axis=1)
+def FlechasImagenesFB(imagen1, imagen2):
+    sift = cv2.SIFT_create()                                                # Creamos un objeto SIFT para poder operar
+    (keypoints_1, descriptors_1) = sift.detectAndCompute(imagen1, None)     # Computamos keypoints y detectores para las dos imagenes
+    (keypoints_2, descriptors_2) = sift.detectAndCompute(imagen2, None)
+    img_compuesta = np.concatenate((imagen1, imagen2), axis=1)              # Unimos las dos imagenes
     matcher = cv2.BFMatcher.create(normType=cv2.NORM_L1, crossCheck=True)
-    matches = matcher.match(descriptors_1, descriptors_2)
-    for i in range(10):
-        indice_1 = matches[i].trainIdx
-        indice_2 = matches[i].queryIdx
-        punto_1 = keypoints_1[indice_1].pt
-        punto_2 = keypoints_2[indice_2].pt
-        punto_1 = tuple(map(int, punto_1))
-        punto_2 = tuple(map(int, punto_2))
-        punto_2 = tuple(map(lambda x, y: x + y, punto_2, (yosemite1.shape[1],0)))
-        print(punto_1, punto_2)
-        cv2.arrowedLine(img_compuesta, punto_1, punto_2, (255, 0, 0),10)
+    matches_bf = matcher.match(descriptors_1, descriptors_2)
+    indices_random=np.random.randint(0,len(matches_bf),100)
+    matches_azar=[]
+    for i in range(100):
+        matches_azar.append(matches_bf[indices_random[i]])
 
     plt.figure(uuid.uuid4(), figsize=(20, 20))
-    plt.imshow(img_compuesta)
+    plt.imshow(cv2.drawMatches(imagen1, keypoints_1, imagen2, keypoints_2, matches_azar, img_compuesta, flags=cv2.DRAW_MATCHES_FLAGS_NOT_DRAW_SINGLE_POINTS))
     plt.show()
-    return 0
 
+
+def FlechasImagenesKNN(imagen1, imagen2):
+    sift = cv2.SIFT_create()  # Creamos un objeto SIFT para poder operar
+    (keypoints_1, descriptors_1) = sift.detectAndCompute(imagen1, None)  # Computamos keypoints y detectores para las dos imagenes
+    (keypoints_2, descriptors_2) = sift.detectAndCompute(imagen2, None)
+    img_compuesta = np.concatenate((imagen1, imagen2), axis=1)  # Unimos las dos imagenes
+    matcher = cv2.BFMatcher.create(normType=cv2.NORM_L1, crossCheck=False)
+    matches_knn = matcher.knnMatch(descriptors_1, descriptors_2,2)
+    # Apply ratio test
+    good = []
+    for m, n in matches_knn:
+        if m.distance < 0.75 * n.distance:
+            good.append(m)
+    indices_random = np.random.randint(0, len(good), 100)
+    matches_azar = []
+    for i in range(100):
+        matches_azar.append(good[indices_random[i]])
+
+    print(good)
+
+    plt.figure(uuid.uuid4(), figsize=(20, 20))
+    plt.imshow(cv2.drawMatches(imagen1, keypoints_1, imagen2, keypoints_2, matches_azar, img_compuesta, flags=cv2.DRAW_MATCHES_FLAGS_NOT_DRAW_SINGLE_POINTS))
+    plt.show()
+
+def ejercicio8():
+    yosemite1 = cv2.imread(r"C:\Users\Usuario\Desktop\UNIVERSIDAD\Vision por Computador\Practica 2\Yosemite1.jpg", 0)
+    yosemite2 = cv2.imread(r"C:\Users\Usuario\Desktop\UNIVERSIDAD\Vision por Computador\Practica 2\Yosemite2.jpg", 0)
+    FlechasImagenesFB(yosemite1, yosemite2)
+    FlechasImagenesKNN(yosemite1, yosemite2)
 
 
 if __name__ == '__main__':
