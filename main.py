@@ -1,4 +1,6 @@
 import math
+
+import cv2.cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
@@ -292,27 +294,66 @@ def HallarExtremosLocalesV2(DoG, sigma_inicial):
     return lista_maximos
 
 
+def HallarExtremosLocalesInfo(DoG, sigma_inicial):
+    lista_maximos = []
+    for i in range(len(DoG)):
+        print("Octava:", i)
+        for j in range(1, len(DoG[i]) - 1):
+            print("Escala:", j)
+            imagen = DoG[i][j]
+            sigma = CalculaSigmaEscala(j, 3, sigma_inicial * (2 ** i))
+            print(sigma)
+            for k in range(1, imagen.shape[0] - 1):
+                for l in range(1, imagen.shape[1] - 1):
+                    # Comprobamos si es extremo de sus vecinos
+                    vecinos = np.copy(imagen[k - 1:k + 2, l - 1:l + 2])
+                    valor = imagen[k, l]
+                    vecinos[1][1] = vecinos[1][0]
+
+                    if valor < np.min(vecinos):
+                        vecinos_abajo = DoG[i][j - 1][k - 1:k + 2, l - 1:l + 2]
+                        vecinos_arriba = DoG[i][j + 1][k - 1:k + 2, l - 1:l + 2]
+                        min_arriba = np.min(vecinos_arriba)
+                        min_abajo = np.min(vecinos_abajo)
+                        if valor < min_arriba and valor < min_abajo:
+                            lista_maximos.append(np.array([valor, l, k, i, j, sigma]))
+
+                    elif valor > np.max(vecinos):
+                        vecinos_abajo = DoG[i][j - 1][k - 1:k + 2, l - 1:l + 2]
+                        vecinos_arriba = DoG[i][j + 1][k - 1:k + 2, l - 1:l + 2]
+                        max_arriba = np.max(vecinos_arriba)
+                        max_abajo = np.max(vecinos_abajo)
+                        if (valor > max_arriba) and (valor > max_abajo):
+                            lista_maximos.append(np.array([valor, l, k, i, j, sigma]))
+
+    return lista_maximos
+
+
 def DevolverValor(a):
     return a[0]
 
 
-def ObtenerKeypointsSignificativos(lista_max):
+def ObtenerCienMejores(lista_max):
     cien_mejores = np.copy(lista_max)
-    cien_mejores_ordenador = cien_mejores[cien_mejores[:, 0].argsort()]
-    cien_mejores_ordenador = np.concatenate((cien_mejores_ordenador[0:49, :], cien_mejores_ordenador[-50:, :]))
+    cien_mejores_ordenador = sorted(cien_mejores, key=lambda x: abs(x[0]))
+    cien_mejores_ordenador = cien_mejores_ordenador[-100:]
     keypoints = []
-    for i in range(cien_mejores_ordenador.shape[0]):
+    for i in range(len(cien_mejores_ordenador)):
         keypoints.append(cien_mejores_ordenador[i][1])
 
     return keypoints
 
 
+
 def DerivaDogX(dog):
     derivada_dog = []
+    octava = []
 
-    for i in range(dog):
-        for j in range(dog[i]):
-            derivada_dog.append(ConvolucionarK1D([1, 0, -1], dog[i][j]))
+    for i in range(len(dog)):
+        octava = []
+        for j in range(len(dog[i])):
+            octava.append(ConvolucionarK1D([1, 0, -1], dog[i][j]))
+        derivada_dog.append(octava)
 
     return derivada_dog
 
@@ -320,9 +361,11 @@ def DerivaDogX(dog):
 def DerivaDogY(dog):
     derivada_dog = []
 
-    for i in range(dog):
-        for j in range(dog[i]):
-            derivada_dog.append(np.transpose(ConvolucionarK1D([1, 0, -1], np.transpose(dog[i][j]))))
+    for i in range(len(dog)):
+        octava = []
+        for j in range(len(dog[i])):
+            octava.append(np.transpose(ConvolucionarK1D([1, 0, -1], np.transpose(dog[i][j]))))
+        derivada_dog.append(octava)
 
     return derivada_dog
 
@@ -330,32 +373,126 @@ def DerivaDogY(dog):
 def DerivaDogSigma(dog):
     derivada_dog = dog.copy()
 
-    for i in range(dog):
-        for j in range(1, len(dog[i])):
+    for i in range(len(dog)):
+        for j in range(1, len(dog[i])-1):
             for k in range(dog[i][j].shape[0]):
-                for m in range(dog[i][j].shape[0]):
+                for m in range(dog[i][j].shape[1]):
                     derivada_dog[i][j][k][m] = derivada_dog[i][j-1][k][m]-derivada_dog[i][j+1][k][m]
 
     return derivada_dog
 
+def derivada_en_x(maximo,dog):
+    # valor = lista_max[i][0]
+    # octava = lista_max[i][3]
+    # escala = lista_max[i][4]
+    # x = lista_max[i][1]
+    # y = lista_max[i][2]
+    return dog[maximo[3]][maximo[4]][maximo[2], maximo[1]-1] - dog[maximo[3]][maximo[4]][maximo[2], maximo[1]+1]
+
+def derivada_en_y(maximo,dog):
+    # valor = lista_max[i][0]
+    # octava = lista_max[i][3]
+    # escala = lista_max[i][4]
+    # x = lista_max[i][1]
+    # y = lista_max[i][2]
+    return dog[maximo[3]][maximo[4]][maximo[2]-1, maximo[1]] - dog[maximo[3]][maximo[4]][maximo[2]+1, maximo[1]]
+
+def derivada_en_sigma(maximo,dog):
+    # valor = lista_max[i][0]
+    # octava = lista_max[i][3]
+    # escala = lista_max[i][4]
+    # x = lista_max[i][1]
+    # y = lista_max[i][2]
+    return dog[maximo[3]][maximo[4]-1][maximo[2], maximo[1]] - dog[maximo[3]][maximo[4]+1][maximo[2], maximo[1]]
+
+def derivada_en_x(maximo,dog):
+    # valor = lista_max[i][0]
+    # octava = lista_max[i][3]
+    # escala = lista_max[i][4]
+    # x = lista_max[i][1]
+    # y = lista_max[i][2]
+    return dog[int(maximo[3])][int(maximo[4])][int(maximo[2]), int(maximo[1]-1)] - dog[int(maximo[3])][int(maximo[4])][int(maximo[2]), int(maximo[1]+1)]
+
+def derivada_en_y(maximo,dog):
+    # valor = lista_max[i][0]
+    # octava = lista_max[i][3]
+    # escala = lista_max[i][4]
+    # x = lista_max[i][1]
+    # y = lista_max[i][2]
+    return dog[int(maximo[3])][int(maximo[4])][int(maximo[2]-1), int(maximo[1])] - dog[int(maximo[3])][int(maximo[4])][int(maximo[2]+1), int(maximo[1])]
+
+def derivada_en_sigma(maximo,dog):
+    # valor = lista_max[i][0]
+    # octava = lista_max[i][3]
+    # escala = lista_max[i][4]
+    # x = lista_max[i][1]
+    # y = lista_max[i][2]
+    return dog[int(maximo[3])][int(maximo[4]-1)][int(maximo[2]-1), int(maximo[1])] - dog[int(maximo[3])][int(maximo[4]+1)][int(maximo[2]+1), int(maximo[1])]
+
 
 # Debemos calcular para el punto x^ = (x,y,sigma) D(x^)=
-def ObtenerKeypointsSignificativosv2(lista_max, dog_img, sigma_inicial):
-    keypoints = []
-    # Necesitamos la primera derivada y la segunda derivada del DoG, tanto en x, como en y, como en sigma
-    # Primeras derivadas
-    derivada_x = DerivaDogX(dog_img)
-    derivada_y = DerivaDogY(dog_img)
-    derivada_sigma = DerivaDogSigma(dog_img)
-    # Segundas derivadas
-    segunda_derivada_x = DerivaDogX(derivada_x)
-    segunda_derivada_y = DerivaDogX(derivada_y)
-    segunda_derivada_sigma = DerivaDogSigma(derivada_sigma)
+def ObtenerKeypointsSignificativosv2(lista_max, dog_img):
 
-    for i in range(lista_max):
-        valor = lista_max[i][1]+1
+    maximos_refinados = []
+
+    # Primera derivadas de el dog_completo
+    dog_derivada_x = DerivaDogX(dog_img)
+    dog_derivada_y = DerivaDogY(dog_img)
+    dog_derivada_sigma = DerivaDogSigma(dog_img)
+
+    for i in range(len(lista_max)):
+
+        octava = int(lista_max[i][3])
+        escala = int(lista_max[i][4])
+        x = int(lista_max[i][1])
+        y = int(lista_max[i][2])
+        sigma=lista_max[i][5]
+
+        hessiano = np.array([[derivada_en_x(lista_max[i], dog_derivada_x),       derivada_en_y(lista_max[i], dog_derivada_x),          derivada_en_sigma(lista_max[i], dog_derivada_x)],
+                            [derivada_en_x(lista_max[i], dog_derivada_y),       derivada_en_y(lista_max[i], dog_derivada_y),          derivada_en_sigma(lista_max[i], dog_derivada_y)],
+                            [derivada_en_x(lista_max[i], dog_derivada_sigma),   derivada_en_y(lista_max[i], dog_derivada_sigma),  derivada_en_sigma(lista_max[i], dog_derivada_sigma)]])
+
+        jacobiano = np.array([dog_derivada_x[octava][escala][y, x],
+                              dog_derivada_y[octava][escala][y, x],
+                              dog_derivada_sigma[octava][escala][y, x]])
+
+        offset = -np.linalg.inv(hessiano) * jacobiano
+
+        if offset[0][0] > 0.5:
+            lista_max[i][1] = lista_max[i][1] + 1
+        if offset[0][1] > 0.5:
+            lista_max[i][2] = lista_max[i][2] + 1
+        if offset[0][2] > 0.5:
+            lista_max[i][5] = lista_max[i][5] + 1
+
+        maximos_refinados.append(lista_max)
+
+    keypoints = []
+    for i in range(len(maximos_refinados)):
+        octava = int(lista_max[i][3])
+        x = int(lista_max[i][1])
+        y = int(lista_max[i][2])
+        sigma = lista_max[i][5]
+        valor = lista_max[i][0]
+
+        keypoints.append([valor, cv2.cv2.KeyPoint(x * (2 ** octava), y * (2 ** octava), sigma*2*6)])
 
     return keypoints
+
+
+def KeyPointsSinRefinar(img, oct, esc, sigma_inicial):
+    img_semilla = ImagenSemilla(img)
+    print("Creando espacio de escalas...")
+    octavas_img = Octavas(oct, esc, img_semilla, sigma_inicial)
+    print("Creando diferencia de gaussianas...")
+    dog_img = DiferenciaDeGaussianas(octavas_img)
+    print("Hallando extremos locales...")
+    lista_maximos_img = HallarExtremosLocales(dog_img, sigma_inicial)
+    print("Extremos locales hayados:", len(lista_maximos_img), ". Refinando...")
+    keypoints_img = ObtenerCienMejores(lista_maximos_img)
+    img_final = cv2.drawKeypoints(img, keypoints_img, None, flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+    return img_final
+
 
 
 def KeyPoints(img, oct, esc, sigma_inicial):
@@ -365,12 +502,14 @@ def KeyPoints(img, oct, esc, sigma_inicial):
     print("Creando diferencia de gaussianas...")
     dog_img = DiferenciaDeGaussianas(octavas_img)
     print("Hallando extremos locales...")
-    lista_maximos_img = HallarExtremosLocales(dog_img, sigma_inicial)
+    lista_maximos_img = HallarExtremosLocalesInfo(dog_img, sigma_inicial)
     print("Extremos locales hayados:", len(lista_maximos_img), ". Refinando...")
-    keypoints_img = ObtenerKeypointsSignificativos(lista_maximos_img)
-    # for i in range(len(keypoints_img)):
-    #   print("Coord:",keypoints_img[i].pt,"Size calculo:",keypoints_img[i].size,"Size func.",keypoints_img[i].angle)
-    img_final = cv2.drawKeypoints(img, keypoints_img, None, flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+    keypoints_img = ObtenerKeypointsSignificativosv2(lista_maximos_img, dog_img)
+    print("Extremos locales refinados:", len(keypoints_img), ".")
+    print("Obteniendo los 100 mejores...")
+    keypoints_img_final = ObtenerCienMejores(keypoints_img)
+    img_final = cv2.drawKeypoints(img, keypoints_img_final, None, flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+
     return img_final
 
 
@@ -449,32 +588,48 @@ def ejercicio6():
 
 
 def ejercicio7():
-    gato = cv2.imread(r"C:\Users\judith\Desktop\UNIVERSIDAD\Vision por Computador\Practica 1\perro.jpg", 0)
+    yosemite1 = cv2.imread(r"C:\Users\judith\Desktop\UNIVERSIDAD\Vision por Computador\Practica 2\Yosemite1.jpg", 0)
+    yosemite2 = cv2.imread(r"C:\Users\judith\Desktop\UNIVERSIDAD\Vision por Computador\Practica 2\Yosemite2.jpg", 0)
     plt.figure(uuid.uuid4(), figsize=(20, 20))
-    plt.imshow(KeyPoints(gato, 3, 3, 1.6))
+    plt.imshow(KeyPoints(yosemite1, 3, 3, 1.6))
+    plt.show()
+    plt.figure(uuid.uuid4(), figsize=(20, 20))
+    plt.imshow(KeyPoints(yosemite2, 3, 3, 1.6))
+    plt.show()
+
+def ejercicio7sinrefinar():
+    gato = cv2.imread(r"C:\Users\judith\Desktop\UNIVERSIDAD\Vision por Computador\Practica 1\gato.jpg", 0)
+    plt.figure(uuid.uuid4(), figsize=(20, 20))
+    plt.imshow(KeyPointsSinRefinar(gato, 3, 3, 1.6))
     plt.show()
 
 
 def ejercicio8():
-    # Cargamos la imagen sigma=0.5
-    gato = cv2.imread(r"C:\Users\Usuario\Desktop\Universidad\Informatica\Vision por Computador/Yosemite1.jpg", 0)
-    # Creamos la imagen inicial del espacio de escalas, upscaling con delta=1 y computamos y sigma inicial de 0.8
-    gato_upsampleado = Upsampling(gato, 2)
-    gato_semilla = ImagenSemillaSuboctava(gato_upsampleado)
-    # Creamos el espacio de escalas
-    octavas_gato = Octavas(3, 4, gato_semilla, 0.8)
-    # Creamos las Diferencias de Gaussianas
-    dog_gato = DiferenciaDeGaussianas(octavas_gato)
-    # Hallamos los extremos locales
-    extremos = HallarExtremosLocales(dog_gato, 0.8)
-    # Tomamos los significativos
-    extremos_significativos = ObtenerKeypointsSignificativos(extremos)
-    print(len(extremos_significativos))
-    # Los pintamos sobre la imagen
-    gato_keypoints = cv2.drawKeypoints(gato, extremos_significativos, None, flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+    sift = cv2.SIFT_create()
+    # Extraer puntos SIFT con detect and compute
+    yosemite1 = cv2.imread(r"C:\Users\judith\Desktop\UNIVERSIDAD\Vision por Computador\Practica 2\Yosemite1.jpg", 0)
+    yosemite2 = cv2.imread(r"C:\Users\judith\Desktop\UNIVERSIDAD\Vision por Computador\Practica 2\Yosemite2.jpg", 0)
+    (keypoints_1, descriptors_1) = sift.detectAndCompute(yosemite1, None)
+    (keypoints_2, descriptors_2) = sift.detectAndCompute(yosemite2, None)
+    img_compuesta = np.concatenate((yosemite1, yosemite2), axis=1)
+    matcher = cv2.BFMatcher.create(normType=cv2.NORM_L1, crossCheck=True)
+    matches = matcher.match(descriptors_1, descriptors_2)
+    for i in range(10):
+        indice_1 = matches[i].trainIdx
+        indice_2 = matches[i].queryIdx
+        punto_1 = keypoints_1[indice_1].pt
+        punto_2 = keypoints_2[indice_2].pt
+        punto_1 = tuple(map(int, punto_1))
+        punto_2 = tuple(map(int, punto_2))
+        punto_2 = tuple(map(lambda x, y: x + y, punto_2, (yosemite1.shape[1],0)))
+        print(punto_1, punto_2)
+        cv2.arrowedLine(img_compuesta, punto_1, punto_2, (255, 0, 0),10)
+
     plt.figure(uuid.uuid4(), figsize=(20, 20))
-    plt.imshow(gato_keypoints)
+    plt.imshow(img_compuesta)
     plt.show()
+    return 0
+
 
 
 if __name__ == '__main__':
@@ -484,5 +639,5 @@ if __name__ == '__main__':
     # ejercicio4()
     # ejercicio5()
     # ejercicio6()
-    ejercicio7()
-    # ejercicio8()
+    # ejercicio7()
+    ejercicio8()
