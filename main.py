@@ -638,18 +638,56 @@ def FlechasImagenesKNN(imagen1, imagen2):
     for i in range(100):
         matches_azar.append(good[indices_random[i]])
 
-    print(good)
-
     plt.figure(uuid.uuid4(), figsize=(20, 20))
     plt.imshow(cv2.drawMatches(imagen1, keypoints_1, imagen2, keypoints_2, matches_azar, img_compuesta, flags=cv2.DRAW_MATCHES_FLAGS_NOT_DRAW_SINGLE_POINTS))
     plt.show()
 
+    return matches_azar
+
+
+def Homografia(imagen1, imagen2):
+    sift = cv2.SIFT_create()                                              # Creamos un objeto SIFT para poder operar
+    (keypoints_1, descriptors_1) = sift.detectAndCompute(imagen1,None)    # Computamos keypoints
+    (keypoints_2, descriptors_2) = sift.detectAndCompute(imagen2, None)   # y detectores para las dos imagenes
+
+    matcher = cv2.BFMatcher.create(normType=cv2.NORM_L1, crossCheck=False)
+    matches_knn = matcher.knnMatch(descriptors_1, descriptors_2, 2)
+
+    # Apply ratio test
+    good = []
+    for m, n in matches_knn:
+        if m.distance < 0.75 * n.distance:
+            good.append(m)
+
+    indices_random = np.random.randint(0, len(good), 100)
+    matches_azar = []
+    for i in range(100):
+        matches_azar.append(good[indices_random[i]])
+
+    # Tomamos los keypoints de los matches al azar tomados
+
+    keypoints_src = np.zeros(len(matches_azar))
+    keypoints_dst = np.array(len(matches_azar))
+
+    for i in range(len(matches_azar)):
+        keypoints_src[i] = keypoints_1[matches_azar[i].queryIdx].pt
+        keypoints_dst[i] = keypoints_2[matches_azar[i].trainIdx].pt
+
+    homografia = cv2.findHomography(keypoints_src, keypoints_dst, cv2.RANSAC)
+
+    return homografia
+
 def ejercicio8():
-    yosemite1 = cv2.imread(r"C:\Users\Usuario\Desktop\UNIVERSIDAD\Vision por Computador\Practica 2\Yosemite1.jpg", 0)
-    yosemite2 = cv2.imread(r"C:\Users\Usuario\Desktop\UNIVERSIDAD\Vision por Computador\Practica 2\Yosemite2.jpg", 0)
+    yosemite1 = cv2.imread(r"C:\Users\Judith\Desktop\UNIVERSIDAD\Vision por Computador\Practica 2\Yosemite1.jpg", 0)
+    yosemite2 = cv2.imread(r"C:\Users\Judith\Desktop\UNIVERSIDAD\Vision por Computador\Practica 2\Yosemite2.jpg", 0)
     FlechasImagenesFB(yosemite1, yosemite2)
     FlechasImagenesKNN(yosemite1, yosemite2)
 
+
+def ejercicio9():
+    yosemite1 = cv2.imread(r"C:\Users\Judith\Desktop\UNIVERSIDAD\Vision por Computador\Practica 2\Yosemite1.jpg", 0)
+    yosemite2 = cv2.imread(r"C:\Users\Judith\Desktop\UNIVERSIDAD\Vision por Computador\Practica 2\Yosemite2.jpg", 0)
+    Homografia(yosemite1, yosemite2)
 
 if __name__ == '__main__':
     # ejercicio1()
@@ -659,4 +697,4 @@ if __name__ == '__main__':
     # ejercicio5()
     # ejercicio6()
     # ejercicio7()
-    ejercicio8()
+    ejercicio9()
