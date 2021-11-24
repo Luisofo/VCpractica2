@@ -588,8 +588,8 @@ def ejercicio6():
 
 
 def ejercicio7():
-    yosemite1 = cv2.imread(r"C:\Users\judith\Desktop\UNIVERSIDAD\Vision por Computador\Practica 2\Yosemite1.jpg", 0)
-    yosemite2 = cv2.imread(r"C:\Users\judith\Desktop\UNIVERSIDAD\Vision por Computador\Practica 2\Yosemite2.jpg", 0)
+    yosemite1 = cv2.imread(r"C:\Users\Usuario\Desktop\UNIVERSIDAD\Vision por Computador\Practica 2\Yosemite1.jpg", 0)
+    yosemite2 = cv2.imread(r"C:\Users\Usuario\Desktop\UNIVERSIDAD\Vision por Computador\Practica 2\Yosemite2.jpg", 0)
     plt.figure(uuid.uuid4(), figsize=(20, 20))
     plt.imshow(KeyPoints(yosemite1, 3, 3, 1.6))
     plt.show()
@@ -646,9 +646,9 @@ def FlechasImagenesKNN(imagen1, imagen2):
 
 
 def Homografia(imagen1, imagen2):
-    sift = cv2.SIFT_create()                                              # Creamos un objeto SIFT para poder operar
-    (keypoints_1, descriptors_1) = sift.detectAndCompute(imagen1,None)    # Computamos keypoints
-    (keypoints_2, descriptors_2) = sift.detectAndCompute(imagen2, None)   # y detectores para las dos imagenes
+    sift = cv2.SIFT_create()                                               # Creamos un objeto SIFT para poder operar
+    (keypoints_1, descriptors_1) = sift.detectAndCompute(imagen1, None)    # Computamos keypoints
+    (keypoints_2, descriptors_2) = sift.detectAndCompute(imagen2, None)    # y detectores para las dos imagenes
 
     matcher = cv2.BFMatcher.create(normType=cv2.NORM_L1, crossCheck=False)
     matches_knn = matcher.knnMatch(descriptors_1, descriptors_2, 2)
@@ -666,16 +666,44 @@ def Homografia(imagen1, imagen2):
 
     # Tomamos los keypoints de los matches al azar tomados
 
-    keypoints_src = np.zeros(len(matches_azar))
-    keypoints_dst = np.array(len(matches_azar))
+    keypoints_src = np.float32([keypoints_1[m.queryIdx].pt for m in matches_azar]).reshape(-1, 1, 2)
+    keypoints_dst = np.float32([keypoints_2[m.trainIdx].pt for m in matches_azar]).reshape(-1, 1, 2)
 
-    for i in range(len(matches_azar)):
-        keypoints_src[i] = keypoints_1[matches_azar[i].queryIdx].pt
-        keypoints_dst[i] = keypoints_2[matches_azar[i].trainIdx].pt
-
-    homografia = cv2.findHomography(keypoints_src, keypoints_dst, cv2.RANSAC)
+    homografia, mascara = cv2.findHomography(keypoints_dst, keypoints_src, cv2.RANSAC, 5.0)
 
     return homografia
+
+
+def Mosaico(imagen1, imagen2, imagen3):
+
+    canvas = np.zeros(shape=(imagen2.shape[0], imagen1.shape[1]+imagen2.shape[1]+imagen3.shape[1]))
+
+    alto_canvas = canvas.shape[0]
+    ancho_canvas = canvas.shape[1]
+
+    h0 = np.array([[1.0, 0.0, (ancho_canvas // 2 - imagen2.shape[1] // 2)],
+                   [0.0, 1.0, (alto_canvas // 2 - imagen2.shape[0] // 2)],
+                   [0.0, 0.0, 1.0]])
+
+    h1 = Homografia(imagen2, imagen1)
+    h2 = Homografia(imagen2, imagen3)
+
+    #h1 = Homografia(imagen1, imagen2)
+    #h2 = Homografia(imagen3, imagen2)
+
+    canvas = cv2.warpPerspective(imagen1, np.dot(h0, h1), (ancho_canvas, alto_canvas), dst=canvas, borderMode=cv2.BORDER_TRANSPARENT)
+    plt.imshow(canvas)
+    plt.show()
+    canvas = cv2.warpPerspective(imagen3, np.dot(h0, h2), (ancho_canvas, alto_canvas), dst=canvas, borderMode=cv2.BORDER_TRANSPARENT)
+    plt.imshow(canvas)
+    plt.show()
+    canvas = cv2.warpPerspective(imagen2, h0, (ancho_canvas, alto_canvas), dst=canvas, borderMode=cv2.BORDER_TRANSPARENT)
+
+    canvas = cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB)
+
+    return canvas
+
+
 
 def ejercicio8():
     yosemite1 = cv2.imread(r"C:\Users\Judith\Desktop\UNIVERSIDAD\Vision por Computador\Practica 2\Yosemite1.jpg", 0)
@@ -685,9 +713,13 @@ def ejercicio8():
 
 
 def ejercicio9():
-    yosemite1 = cv2.imread(r"C:\Users\Judith\Desktop\UNIVERSIDAD\Vision por Computador\Practica 2\Yosemite1.jpg", 0)
-    yosemite2 = cv2.imread(r"C:\Users\Judith\Desktop\UNIVERSIDAD\Vision por Computador\Practica 2\Yosemite2.jpg", 0)
-    Homografia(yosemite1, yosemite2)
+    alhambra_izq = cv2.imread(r"C:\Users\Usuario\Desktop\UNIVERSIDAD\Vision por Computador\Practica 2\Alhambra_3.jpg", 1)
+    alhambra_ctr = cv2.imread(r"C:\Users\Usuario\Desktop\UNIVERSIDAD\Vision por Computador\Practica 2\Alhambra_4.jpg", 1)
+    alhambra_drc = cv2.imread(r"C:\Users\Usuario\Desktop\UNIVERSIDAD\Vision por Computador\Practica 2\Alhambra_5.jpg", 1)
+
+    plt.figure(uuid.uuid4(), figsize=(40, 40))
+    plt.imshow(Mosaico(alhambra_izq, alhambra_ctr, alhambra_drc))
+    plt.show()
 
 if __name__ == '__main__':
     # ejercicio1()
